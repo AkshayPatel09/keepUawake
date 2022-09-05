@@ -205,13 +205,14 @@
 
         </com.google.android.material.textfield.TextInputLayout>
 
-        <com.google.android.material.button.MaterialButton
+        <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/createAccountBtn"
             android:layout_width="match_parent"
             android:layout_height="48dp"
             android:layout_marginHorizontal="50dp"
             android:layout_marginTop="20dp"
             android:background="@drawable/btn_shape"
+            android:textColor="@color/white"
             android:elegantTextHeight="false"
             android:text="@string/create_account"
             android:textAllCaps="false"

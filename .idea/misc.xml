@@ -3,13 +3,14 @@
   <component name="DesignSurface">
     <option name="filePathToZoomLevelMap">
       <map>
-        <entry key="..\:/Sem-7/MP/KeepUawake/app/src/main/res/drawable/btn_shape.xml" value="0.2075" />
-        <entry key="..\:/Sem-7/MP/KeepUawake/app/src/main/res/layout/activity_home.xml" value="0.11302083333333333" />
-        <entry key="..\:/Sem-7/MP/KeepUawake/app/src/main/res/layout/activity_main.xml" value="0.25416666666666665" />
-        <entry key="..\:/Sem-7/MP/KeepUawake/app/src/main/res/layout/activity_splash.xml" value="0.25416666666666665" />
-        <entry key="..\:/Sem-7/MP/KeepUawake/app/src/main/res/layout/fragment_forget_password.xml" value="0.25416666666666665" />
-        <entry key="..\:/Sem-7/MP/KeepUawake/app/src/main/res/layout/fragment_log_in.xml" value="0.25" />
-        <entry key="..\:/Sem-7/MP/KeepUawake/app/src/main/res/layout/fragment_sign_up.xml" value="0.25416666666666665" />
+        <entry key="..\:/sem7/minor project/keepUawake/app/src/main/res/drawable/btn_shape.xml" value="0.133" />
+        <entry key="..\:/sem7/minor project/keepUawake/app/src/main/res/layout/activity_home.xml" value="0.21784420289855072" />
+        <entry key="..\:/sem7/minor project/keepUawake/app/src/main/res/layout/activity_main.xml" value="0.21784420289855072" />
+        <entry key="..\:/sem7/minor project/keepUawake/app/src/main/res/layout/activity_splash.xml" value="0.21784420289855072" />
+        <entry key="..\:/sem7/minor project/keepUawake/app/src/main/res/layout/fragment_forget_password.xml" value="0.21784420289855072" />
+        <entry key="..\:/sem7/minor project/keepUawake/app/src/main/res/layout/fragment_log_in.xml" value="0.21784420289855072" />
+        <entry key="..\:/sem7/minor project/keepUawake/app/src/main/res/layout/fragment_sign_up.xml" value="0.21784420289855072" />
+        <entry key="..\:/sem7/minor project/keepUawake/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml" value="0.133" />
       </map>
     </option>
   </component>

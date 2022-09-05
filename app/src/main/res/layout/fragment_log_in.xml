@@ -111,7 +111,7 @@
         app:layout_constraintVertical_bias="0.034"
         tools:ignore="HardcodedText" />
 
-    <com.google.android.material.button.MaterialButton
+    <androidx.appcompat.widget.AppCompatButton
         android:id="@+id/login_btn"
         android:layout_width="match_parent"
         android:layout_height="48dp"
@@ -121,7 +121,7 @@
         android:imeOptions="actionDone"
         android:text="Log in"
         android:textAllCaps="false"
-        android:textColor="@color/dark"
+        android:textColor="@color/white"
         android:textSize="20sp"
         android:textStyle="bold"
         app:layout_constraintBottom_toBottomOf="parent"
