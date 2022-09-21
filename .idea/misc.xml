@@ -3,6 +3,12 @@
   <component name="DesignSurface">
     <option name="filePathToZoomLevelMap">
       <map>
+        <entry key="..\:/Sem-7/MP/KeepUawake/app/src/main/res/layout/activity_home.xml" value="0.264" />
+        <entry key="..\:/Sem-7/MP/KeepUawake/app/src/main/res/layout/activity_main.xml" value="0.1526268115942029" />
+        <entry key="..\:/Sem-7/MP/KeepUawake/app/src/main/res/layout/activity_splash.xml" value="0.25416666666666665" />
+        <entry key="..\:/Sem-7/MP/KeepUawake/app/src/main/res/layout/fragment_camera.xml" value="0.25416666666666665" />
+        <entry key="..\:/Sem-7/MP/KeepUawake/app/src/main/res/layout/fragment_dashboard.xml" value="0.12360688956433637" />
+        <entry key="..\:/Sem-7/MP/KeepUawake/app/src/main/res/layout/fragment_log_in.xml" value="0.1526268115942029" />
         <entry key="..\:/sem7/minor project/keepUawake/app/src/main/res/drawable/btn_shape.xml" value="0.133" />
         <entry key="..\:/sem7/minor project/keepUawake/app/src/main/res/layout/activity_home.xml" value="0.21784420289855072" />
         <entry key="..\:/sem7/minor project/keepUawake/app/src/main/res/layout/activity_main.xml" value="0.21784420289855072" />

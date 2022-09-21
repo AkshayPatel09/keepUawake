@@ -43,4 +43,6 @@
     <string name="apply_changes">Apply Changes</string>
     <string name="title_activity_maps">MapsActivity</string>
     <string name="notification">Notification</string>
+    <string name="start">Start</string>
+    <string name="logout">Logout</string>
 </resources>
