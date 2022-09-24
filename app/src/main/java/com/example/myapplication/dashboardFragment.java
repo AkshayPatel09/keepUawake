@@ -1,10 +1,14 @@
 package com.example.myapplication;
 
+import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
 
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentTransaction;
 
@@ -79,6 +83,11 @@ public class dashboardFragment extends Fragment {
         startBtn = v.findViewById(R.id.startBtn);
         logOutBtn = v.findViewById(R.id.logoutBtn);
 
+        if(ContextCompat.checkSelfPermission(getActivity(), Manifest.permission.CAMERA)
+                != PackageManager.PERMISSION_GRANTED){
+            ActivityCompat.requestPermissions(getActivity(), new String[] { Manifest.permission.CAMERA }, 100);
+
+        }
         logOutBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -94,10 +103,12 @@ public class dashboardFragment extends Fragment {
         startBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+
                 FragmentTransaction transaction = getActivity().getSupportFragmentManager().beginTransaction();
                 fragment = new cameraFragment();
                 transaction.replace(R.id.flMain, fragment);
                 transaction.commit();
+
             }
         });
         return v;
