@@ -1,5 +1,6 @@
 package com.example.myapplication;
 
+
 import static android.content.ContentValues.TAG;
 import static android.provider.MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE;
 
@@ -166,6 +167,7 @@ public class cameraFragment extends Fragment {
             @Override
             public void onClick(View v) {
                 takePicture();
+                predict();
 //                if(mCamera!=null)
 //                mCamera.release();
 //                FragmentTransaction transaction = getActivity().getSupportFragmentManager().beginTransaction();
@@ -179,6 +181,16 @@ public class cameraFragment extends Fragment {
 
         return v;
     }
+    void predict(){
+
+//        System.loadLibrary( Core.NATIVE_LIBRARY_NAME );
+//
+//        //Instantiating the Imagecodecs class
+//        Imgcodecs imageCodecs = new Imgcodecs();
+//
+//        Mat matrix = imageCodecs.imread(file);
+    }
+
 
     TextureView.SurfaceTextureListener textureListener = new TextureView.SurfaceTextureListener() {
         @Override
