@@ -43,6 +43,7 @@ import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.Toast;
 
@@ -51,6 +52,9 @@ import com.android.volley.RequestQueue;
 import com.android.volley.VolleyError;
 import com.android.volley.toolbox.StringRequest;
 import com.android.volley.toolbox.Volley;
+import com.chaquo.python.PyObject;
+import com.chaquo.python.Python;
+import com.chaquo.python.android.AndroidPlatform;
 import com.google.android.material.button.MaterialButton;
 
 import java.io.File;
@@ -113,6 +117,12 @@ public class cameraFragment extends Fragment {
     private boolean mFlashSupported;
     private Handler mBackgroundHandler;
     private HandlerThread mBackgroundThread;
+    private PyObject obj = null;
+    private Python py;
+    private PyObject pyObj;
+    private Handler mHandler= new Handler();
+    private int count = -1;
+    private EditText ts,lv,al,dr;
 
     public cameraFragment() {
         // Required empty public constructor
@@ -152,43 +162,76 @@ public class cameraFragment extends Fragment {
         View v = inflater.inflate(R.layout.fragment_camera, container, false);
         stopTrackingBtn = v.findViewById(R.id.stopTracking);
         textureView = v.findViewById(R.id.camera_preview);
+        al = v.findViewById(R.id.alertEdt);
+        lv = v.findViewById(R.id.lowVigEdt);
+        ts = v.findViewById(R.id.totalSamples);
+        dr = v.findViewById(R.id.drowsyEdt);
         assert textureView != null;
         textureView.setSurfaceTextureListener(textureListener);
-//        takePictureButton = (Button) findViewById(R.id.btn_takepicture);
-//        assert takePictureButton != null;
-//        takePictureButton.setOnClickListener(new View.OnClickListener() {
-//            @Override
-//            public void onClick(View v) {
-//                takePicture();
-//            }
-//        });
+        if(!Python.isStarted())
+            Python.start(new AndroidPlatform(getActivity()));
+
+        py = Python.getInstance();
+        pyObj = py.getModule("script");
+        mHandler.postDelayed(runnable,2000);
 
         stopTrackingBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                takePicture();
-                predict();
+                mHandler.removeCallbacks(runnable);
+                closeCamera();
 //                if(mCamera!=null)
 //                mCamera.release();
-//                FragmentTransaction transaction = getActivity().getSupportFragmentManager().beginTransaction();
-//                dashboardFragment fragment = new dashboardFragment();
-//                transaction.replace(R.id.flMain, fragment);
-//                transaction.commit();
+                FragmentTransaction transaction = getActivity().getSupportFragmentManager().beginTransaction();
+                dashboardFragment fragment = new dashboardFragment();
+                transaction.replace(R.id.flMain, fragment);
+                transaction.commit();
             }
         });
 
-
-
         return v;
     }
-    void predict(){
 
-//        System.loadLibrary( Core.NATIVE_LIBRARY_NAME );
-//
-//        //Instantiating the Imagecodecs class
-//        Imgcodecs imageCodecs = new Imgcodecs();
-//
-//        Mat matrix = imageCodecs.imread(file);
+    private Runnable runnable = new Runnable() {
+        @Override
+        public void run() {
+            takePicture();
+            count += 1;
+            ts.setText(Integer.toString(count));
+            if(obj!=null) {
+                int result = Integer.parseInt(obj.toString());
+                String temp;
+                int cnt;
+                switch (result) {
+                    case 0:
+                        temp = al.getText().toString();
+                        cnt = Integer.parseInt(temp);
+                        cnt += 1;
+                        al.setText(Integer.toString(cnt));
+                        break;
+                    case 1:
+                        temp = lv.getText().toString();
+                        cnt = Integer.parseInt(temp);
+                        cnt += 1;
+                        lv.setText(Integer.toString(cnt));
+                        break;
+                    case 2:
+                        temp = dr.getText().toString();
+                        cnt = Integer.parseInt(temp);
+                        cnt += 1;
+                        dr.setText(Integer.toString(cnt));
+                        break;
+                    default:
+                        Toast.makeText(getActivity(), "Face not found!!", Toast.LENGTH_SHORT).show();
+
+                }
+            }
+            mHandler.postDelayed(this,5000);
+        }
+    };
+    void predict(String img){
+        obj = pyObj.callAttr("main",img);
+//        Toast.makeText(getActivity(), obj.toString(), Toast.LENGTH_SHORT).show();
     }
 
 
@@ -239,7 +282,7 @@ public class cameraFragment extends Fragment {
         @Override
         public void onCaptureCompleted(CameraCaptureSession session, CaptureRequest request, TotalCaptureResult result) {
             super.onCaptureCompleted(session, request, result);
-            Toast.makeText(getActivity(), "Saved:" + file, Toast.LENGTH_SHORT).show();
+//            Toast.makeText(getActivity(), "Saved:" + file, Toast.LENGTH_SHORT).show();
             createCameraPreview();
         }
     };
@@ -323,7 +366,8 @@ public class cameraFragment extends Fragment {
                         String encodedImage = Base64.encodeToString(bytes , Base64.DEFAULT);
 //                        System.out.println(bytes.toString());
 //                        Log.d("Image",encodedImage);
-                        postDataUsingVolley(encodedImage);
+//                        postDataUsingVolley(encodedImage);
+                        predict(encodedImage);
                         output = new FileOutputStream(file);
                         output.write(bytes);
                     } finally {
@@ -338,7 +382,7 @@ public class cameraFragment extends Fragment {
                 @Override
                 public void onCaptureCompleted(CameraCaptureSession session, CaptureRequest request, TotalCaptureResult result) {
                     super.onCaptureCompleted(session, request, result);
-                    Toast.makeText(getActivity(), "Saved:" + file, Toast.LENGTH_SHORT).show();
+//                    Toast.makeText(getActivity(), "Saved:" + file, Toast.LENGTH_SHORT).show();
                     createCameraPreview();
                 }
             };
