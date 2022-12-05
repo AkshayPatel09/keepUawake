@@ -23,7 +23,7 @@ def main(strImg):
     cropped_image = cv2.resize(cropped_image, dsize=(120, 120), interpolation=cv2.INTER_AREA)
     img = np.array(cropped_image, dtype="float32")
     img = np.reshape(img, (1,120,120,1))
-    filename = join(dirname(__file__), "model.tflite")
+    filename = join(dirname(__file__), "model_8.tflite")
     interpreter = tf.lite.Interpreter(model_path=filename)
 #     interpreter = tf.lite.Interpreter(model_path="../ml/model.tflite")
     interpreter.allocate_tensors()
