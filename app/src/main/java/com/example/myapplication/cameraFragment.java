@@ -1,37 +1,80 @@
 package com.example.myapplication;
 
+
 import static android.content.ContentValues.TAG;
 import static android.provider.MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE;
-import static android.provider.MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO;
 
 import android.Manifest;
 import android.content.Context;
+import android.content.ContextWrapper;
 import android.content.pm.PackageManager;
 
+import android.graphics.ImageFormat;
+import android.graphics.SurfaceTexture;
 import android.hardware.Camera;
+import android.hardware.camera2.CameraAccessException;
+import android.hardware.camera2.CameraCaptureSession;
+import android.hardware.camera2.CameraCharacteristics;
+import android.hardware.camera2.CameraDevice;
+import android.hardware.camera2.CameraManager;
+import android.hardware.camera2.CameraMetadata;
+import android.hardware.camera2.CaptureRequest;
+import android.hardware.camera2.TotalCaptureResult;
+import android.hardware.camera2.params.StreamConfigurationMap;
+import android.media.Image;
+import android.media.ImageReader;
+import android.media.MediaPlayer;
 import android.os.Bundle;
 
+import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentTransaction;
 
 import android.os.Environment;
+import android.os.HandlerThread;
+import android.util.Base64;
 import android.util.Log;
+import android.util.Size;
+import android.util.SparseIntArray;
 import android.view.LayoutInflater;
+import android.view.Surface;
+import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
+import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.Toast;
 
+import com.android.volley.Request;
+import com.android.volley.RequestQueue;
+import com.android.volley.VolleyError;
+import com.android.volley.toolbox.StringRequest;
+import com.android.volley.toolbox.Volley;
+import com.chaquo.python.PyObject;
+import com.chaquo.python.Python;
+import com.chaquo.python.android.AndroidPlatform;
 import com.google.android.material.button.MaterialButton;
 
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.text.SimpleDateFormat;
-import java.util.Date;
+import java.io.OutputStream;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import android.os.Handler;
+import android.os.HandlerThread;
+
+import org.json.JSONException;
+import org.json.JSONObject;
 
 /**
  * A simple {@link Fragment} subclass.
@@ -49,11 +92,39 @@ public class cameraFragment extends Fragment {
     private String mParam1;
     private String mParam2;
 
-    private Camera mCamera;
-    private CameraPreview mPreview;
-    private Camera.PictureCallback mPicture;
+
     private MaterialButton stopTrackingBtn;
-    boolean flag = true;
+    private static final String TAG = "AndroidCameraApi";
+    private Button takePictureButton;
+    private TextureView textureView;
+    private static final SparseIntArray ORIENTATIONS = new SparseIntArray();
+
+    static {
+        ORIENTATIONS.append(Surface.ROTATION_0, 90);
+        ORIENTATIONS.append(Surface.ROTATION_90, 0);
+        ORIENTATIONS.append(Surface.ROTATION_180, 270);
+        ORIENTATIONS.append(Surface.ROTATION_270, 180);
+    }
+
+    private String cameraId;
+    protected CameraDevice cameraDevice;
+    protected CameraCaptureSession cameraCaptureSessions;
+    protected CaptureRequest captureRequest;
+    protected CaptureRequest.Builder captureRequestBuilder;
+    private Size imageDimension;
+    private ImageReader imageReader;
+    private File file;
+    private static final int REQUEST_CAMERA_PERMISSION = 200;
+    private boolean mFlashSupported;
+    private Handler mBackgroundHandler;
+    private HandlerThread mBackgroundThread;
+    private PyObject obj = null;
+    private Python py;
+    private PyObject pyObj;
+    private Handler mHandler= new Handler();
+    private int count = -1;
+    private EditText ts,lv,al,dr;
+    private MediaPlayer mPlayer;
 
     public cameraFragment() {
         // Required empty public constructor
@@ -92,119 +163,446 @@ public class cameraFragment extends Fragment {
         // Inflate the layout for this fragment
         View v = inflater.inflate(R.layout.fragment_camera, container, false);
         stopTrackingBtn = v.findViewById(R.id.stopTracking);
-//        while(flag){
-//            new Reminder(getActivity(),5);
-//        }
+        textureView = v.findViewById(R.id.camera_preview);
+        al = v.findViewById(R.id.alertEdt);
+        lv = v.findViewById(R.id.lowVigEdt);
+        ts = v.findViewById(R.id.totalSamples);
+        dr = v.findViewById(R.id.drowsyEdt);
+        assert textureView != null;
+        textureView.setSurfaceTextureListener(textureListener);
+        mPlayer = MediaPlayer.create(getActivity(), R.raw.ring);
+        if(!Python.isStarted())
+            Python.start(new AndroidPlatform(getActivity()));
+
+        py = Python.getInstance();
+        pyObj = py.getModule("script");
+        mHandler.postDelayed(runnable,2000);
 
         stopTrackingBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                flag = false;
-                if(mCamera!=null)
-                mCamera.release();
+                mHandler.removeCallbacks(runnable);
+//                mHandler.postDelayed(closeRunnable,1000);
+                closeCamera();
+//                if(mCamera!=null)
+//                mCamera.release();
                 FragmentTransaction transaction = getActivity().getSupportFragmentManager().beginTransaction();
                 dashboardFragment fragment = new dashboardFragment();
                 transaction.replace(R.id.flMain, fragment);
                 transaction.commit();
             }
         });
-       mPicture = new Camera.PictureCallback() {
-
-            @Override
-            public void onPictureTaken(byte[] data, Camera camera) {
-
-                File pictureFile = getOutputMediaFile(MEDIA_TYPE_IMAGE);
-                if (pictureFile == null){
-                    Log.d(TAG, "Error creating media file, check storage permissions");
-                    return;
-                }
-
-                try {
-                    FileOutputStream fos = new FileOutputStream(pictureFile);
-                    fos.write(data);
-                    fos.close();
-                } catch (FileNotFoundException e) {
-                    Log.d("error", "File not found: " + e.getMessage());
-                } catch (IOException e) {
-                    Log.d("error", "Error accessing file: " + e.getMessage());
-                }
-            }
-        };
-        if(ContextCompat.checkSelfPermission(getActivity(), Manifest.permission.CAMERA)
-                != PackageManager.PERMISSION_GRANTED){
-            Toast.makeText(getActivity(), "Camera permission not granted!!", Toast.LENGTH_SHORT).show();
-        }else {
-            if (checkCameraHardware(getActivity())) {
-//            Toast.makeText(getActivity(), "Camera Found!!", Toast.LENGTH_SHORT).show();
-                mCamera = getCameraInstance();
-
-                // Create our Preview view and set it as the content of our activity.
-                mPreview = new CameraPreview(getActivity(), mCamera);
-                FrameLayout preview = (FrameLayout) v.findViewById(R.id.camera_preview);
-                preview.addView(mPreview);
-            } else {
-                Toast.makeText(getActivity(), "Device might not have camera!!", Toast.LENGTH_SHORT).show();
-            }
-        }
-//        mCamera.takePicture(null,null,mPicture);
-        new Reminder(getActivity(),5,mCamera,mPicture);
-
 
         return v;
     }
-    private static File getOutputMediaFile(int type){
-        // To be safe, you should check that the SDCard is mounted
-        // using Environment.getExternalStorageState() before doing this.
 
-        File mediaStorageDir = new File(Environment.getExternalStoragePublicDirectory(
-                Environment.DIRECTORY_PICTURES), "MyCameraApp");
-        // This location works best if you want the created images to be shared
-        // between applications and persist after your app has been uninstalled.
 
-        // Create the storage directory if it does not exist
-        if (! mediaStorageDir.exists()){
-            if (! mediaStorageDir.mkdirs()){
-                Log.d("MyCameraApp", "failed to create directory");
-                return null;
+    private Runnable closeRunnable = new Runnable() {
+        @Override
+        public void run() {
+            closeCamera();
+//                if(mCamera!=null)
+//                mCamera.release();
+            FragmentTransaction transaction = getActivity().getSupportFragmentManager().beginTransaction();
+            dashboardFragment fragment = new dashboardFragment();
+            transaction.replace(R.id.flMain, fragment);
+            transaction.commit();
+        }
+    };
+
+    private Runnable runnable = new Runnable() {
+        @Override
+        public void run() {
+            takePicture();
+            count += 1;
+            ts.setText(Integer.toString(count));
+            if(obj!=null) {
+                int result = Integer.parseInt(obj.toString());
+                String temp;
+                int cnt;
+                switch (result) {
+                    case 0:
+                        temp = al.getText().toString();
+                        cnt = Integer.parseInt(temp);
+                        cnt += 1;
+                        al.setText(Integer.toString(cnt));
+                        break;
+                    case 1:
+                        temp = lv.getText().toString();
+                        cnt = Integer.parseInt(temp);
+                        cnt += 1;
+                        lv.setText(Integer.toString(cnt));
+                        break;
+                    case 2:
+                        temp = dr.getText().toString();
+                        cnt = Integer.parseInt(temp);
+                        cnt += 1;
+                        dr.setText(Integer.toString(cnt));
+
+                        mPlayer.start();
+//                        mPlayer.start();
+                        break;
+                    default:
+                        Toast.makeText(getActivity(), "Face not found!!", Toast.LENGTH_SHORT).show();
+
+                }
             }
+            mHandler.postDelayed(this,5000);
         }
-
-        // Create a media file name
-        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
-        File mediaFile;
-        if (type == MEDIA_TYPE_IMAGE){
-            mediaFile = new File(mediaStorageDir.getPath() + File.separator +
-                    "IMG_"+ timeStamp + ".jpg");
-        } else if(type == MEDIA_TYPE_VIDEO) {
-            mediaFile = new File(mediaStorageDir.getPath() + File.separator +
-                    "VID_"+ timeStamp + ".mp4");
-        } else {
-            return null;
-        }
-
-        return mediaFile;
+    };
+    void predict(String img){
+        obj = pyObj.callAttr("main",img);
+//        Toast.makeText(getActivity(), obj.toString(), Toast.LENGTH_SHORT).show();
     }
-    /** Check if this device has a camera */
-    private boolean checkCameraHardware(Context context) {
-        if (context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA)){
-            // this device has a camera
-            return true;
-        } else {
-            // no camera on this device
+
+
+    TextureView.SurfaceTextureListener textureListener = new TextureView.SurfaceTextureListener() {
+        @Override
+        public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
+            //open your camera here
+            openCamera();
+        }
+
+        @Override
+        public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
+            // Transform you image captured size according to the surface width and height
+        }
+
+        @Override
+        public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
             return false;
         }
-    }
-    /** A safe way to get an instance of the Camera object. */
-    public static Camera getCameraInstance(){
-        Camera c = null;
-        try {
-            c = Camera.open(Camera.CameraInfo.CAMERA_FACING_FRONT); // attempt to get a Camera instance
+
+        @Override
+        public void onSurfaceTextureUpdated(SurfaceTexture surface) {
         }
-        catch (Exception e){
-            // Camera is not available (in use or does not exist)
+    };
+
+    private final CameraDevice.StateCallback stateCallback = new CameraDevice.StateCallback() {
+        @Override
+        public void onOpened(CameraDevice camera) {
+            //This is called when the camera is open
+            Log.e(TAG, "onOpened");
+            cameraDevice = camera;
+            createCameraPreview();
         }
-        return c; // returns null if camera is unavailable
+
+        @Override
+        public void onDisconnected(CameraDevice camera) {
+            cameraDevice.close();
+        }
+
+        @Override
+        public void onError(CameraDevice camera, int error) {
+            cameraDevice.close();
+            cameraDevice = null;
+        }
+    };
+
+    final CameraCaptureSession.CaptureCallback captureCallbackListener = new CameraCaptureSession.CaptureCallback() {
+        @Override
+        public void onCaptureCompleted(CameraCaptureSession session, CaptureRequest request, TotalCaptureResult result) {
+            super.onCaptureCompleted(session, request, result);
+//            Toast.makeText(getActivity(), "Saved:" + file, Toast.LENGTH_SHORT).show();
+            createCameraPreview();
+        }
+    };
+
+    protected void startBackgroundThread() {
+        mBackgroundThread = new HandlerThread("Camera Background");
+        mBackgroundThread.start();
+        mBackgroundHandler = new Handler(mBackgroundThread.getLooper());
     }
 
+    protected void stopBackgroundThread() {
+        mBackgroundThread.quitSafely();
+        try {
+            mBackgroundThread.join();
+            mBackgroundThread = null;
+            mBackgroundHandler = null;
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    protected void takePicture() {
+        if (null == cameraDevice) {
+            Log.e(TAG, "cameraDevice is null");
+            return;
+        }
+        CameraManager manager = (CameraManager) getActivity().getSystemService(Context.CAMERA_SERVICE);
+        try {
+            CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraDevice.getId());
+            Size[] jpegSizes = null;
+            if (characteristics != null) {
+                jpegSizes = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP).getOutputSizes(ImageFormat.JPEG);
+            }
+            int width = 640;
+            int height = 480;
+            if (jpegSizes != null && 0 < jpegSizes.length) {
+                width = jpegSizes[0].getWidth();
+                height = jpegSizes[0].getHeight();
+            }
+            ImageReader reader = ImageReader.newInstance(width, height, ImageFormat.JPEG, 1);
+            List<Surface> outputSurfaces = new ArrayList<Surface>(2);
+            outputSurfaces.add(reader.getSurface());
+            outputSurfaces.add(new Surface(textureView.getSurfaceTexture()));
+            final CaptureRequest.Builder captureBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE);
+            captureBuilder.addTarget(reader.getSurface());
+            captureBuilder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO);
+            // Orientation
+            int rotation = getActivity().getWindowManager().getDefaultDisplay().getRotation();
+            captureBuilder.set(CaptureRequest.JPEG_ORIENTATION, ORIENTATIONS.get(rotation));
+//            final File file = new File(Environment.getExternalStorageDirectory() + "/pic.jpg");
+            ContextWrapper cw = new ContextWrapper(getActivity().getApplicationContext());
+            File directory = cw.getDir("imageDir", Context.MODE_PRIVATE);
+            // Create imageDir
+            final File file=new File(directory,"profile.jpg");
+//            Toast.makeText(getActivity(), Environment.getExternalStorageState(), Toast.LENGTH_SHORT).show();
+            ImageReader.OnImageAvailableListener readerListener = new ImageReader.OnImageAvailableListener() {
+                @Override
+                public void onImageAvailable(ImageReader reader) {
+                    Image image = null;
+                    try {
+                        image = reader.acquireLatestImage();
+                        ByteBuffer buffer = image.getPlanes()[0].getBuffer();
+                        byte[] bytes = new byte[buffer.capacity()];
+                        buffer.get(bytes);
+
+                        save(bytes);
+                    } catch (FileNotFoundException e) {
+                        e.printStackTrace();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    } finally {
+                        if (image != null) {
+                            image.close();
+                        }
+                    }
+                }
+
+                private void save(byte[] bytes) throws IOException {
+                    OutputStream output = null;
+                    try {
+                        String encodedImage = Base64.encodeToString(bytes , Base64.DEFAULT);
+//                        System.out.println(bytes.toString());
+//                        Log.d("Image",encodedImage);
+//                        postDataUsingVolley(encodedImage);
+                        predict(encodedImage);
+                        output = new FileOutputStream(file);
+                        output.write(bytes);
+                    } finally {
+                        if (null != output) {
+                            output.close();
+                        }
+                    }
+                }
+            };
+            reader.setOnImageAvailableListener(readerListener, mBackgroundHandler);
+            final CameraCaptureSession.CaptureCallback captureListener = new CameraCaptureSession.CaptureCallback() {
+                @Override
+                public void onCaptureCompleted(CameraCaptureSession session, CaptureRequest request, TotalCaptureResult result) {
+                    super.onCaptureCompleted(session, request, result);
+//                    Toast.makeText(getActivity(), "Saved:" + file, Toast.LENGTH_SHORT).show();
+                    createCameraPreview();
+                }
+            };
+            cameraDevice.createCaptureSession(outputSurfaces, new CameraCaptureSession.StateCallback() {
+                @Override
+                public void onConfigured(CameraCaptureSession session) {
+                    try {
+                        session.capture(captureBuilder.build(), captureListener, mBackgroundHandler);
+                    } catch (CameraAccessException e) {
+                        e.printStackTrace();
+                    }
+                }
+
+                @Override
+                public void onConfigureFailed(CameraCaptureSession session) {
+                }
+            }, mBackgroundHandler);
+        } catch (CameraAccessException e) {
+            e.printStackTrace();
+        }
+    }
+
+    protected void createCameraPreview() {
+        try {
+            SurfaceTexture texture = textureView.getSurfaceTexture();
+            assert texture != null;
+            texture.setDefaultBufferSize(imageDimension.getWidth(), imageDimension.getHeight());
+            Surface surface = new Surface(texture);
+            if (cameraDevice != null) {
+                captureRequestBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
+                captureRequestBuilder.addTarget(surface);
+                cameraDevice.createCaptureSession(Arrays.asList(surface), new CameraCaptureSession.StateCallback() {
+                    @Override
+                    public void onConfigured(@NonNull CameraCaptureSession cameraCaptureSession) {
+                        //The camera is already closed
+                        if (null == cameraDevice) {
+                            return;
+                        }
+                        // When the session is ready, we start displaying the preview.
+                        cameraCaptureSessions = cameraCaptureSession;
+                        updatePreview();
+                    }
+
+                    @Override
+                    public void onConfigureFailed(@NonNull CameraCaptureSession cameraCaptureSession) {
+                        Toast.makeText(getActivity(), "Configuration change", Toast.LENGTH_SHORT).show();
+                    }
+                }, null);
+            }
+        }
+        catch(CameraAccessException e){
+                e.printStackTrace();
+        }
+
+    }
+
+    private void openCamera() {
+        CameraManager manager = (CameraManager) getActivity().getSystemService(Context.CAMERA_SERVICE);
+        Log.e(TAG, "is camera open");
+        try {
+            cameraId = manager.getCameraIdList()[1];
+            CameraCharacteristics characteristics = manager.getCameraCharacteristics(cameraId);
+            StreamConfigurationMap map = characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
+            assert map != null;
+            imageDimension = map.getOutputSizes(SurfaceTexture.class)[0];
+            // Add permission for camera and let user grant the permission
+            if (ActivityCompat.checkSelfPermission(getActivity(), Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(getActivity(), Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(getActivity(), new String[]{Manifest.permission.CAMERA, Manifest.permission.WRITE_EXTERNAL_STORAGE}, REQUEST_CAMERA_PERMISSION);
+                return;
+            }
+            manager.openCamera(cameraId, stateCallback, null);
+        } catch (CameraAccessException e) {
+            e.printStackTrace();
+        }
+        Log.e(TAG, "openCamera X");
+    }
+
+
+    protected void updatePreview() {
+        if (null == cameraDevice) {
+            Log.e(TAG, "updatePreview error, return");
+        }
+        captureRequestBuilder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO);
+        try {
+            cameraCaptureSessions.setRepeatingRequest(captureRequestBuilder.build(), null, mBackgroundHandler);
+        } catch (CameraAccessException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void closeCamera() {
+        if (null != cameraDevice) {
+            cameraDevice.close();
+            cameraDevice = null;
+        }
+        if (null != imageReader) {
+            imageReader.close();
+            imageReader = null;
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        if (requestCode == REQUEST_CAMERA_PERMISSION) {
+            if (grantResults[0] == PackageManager.PERMISSION_DENIED) {
+                // close the app
+                Toast.makeText(getActivity(), "Sorry!!!, you can't use this app without granting permission", Toast.LENGTH_LONG).show();
+//                finish();
+            }
+        }
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        Log.e(TAG, "onResume");
+        startBackgroundThread();
+        if (textureView.isAvailable()) {
+            openCamera();
+        } else {
+            textureView.setSurfaceTextureListener(textureListener);
+        }
+    }
+
+    @Override
+    public void onPause() {
+        Log.e(TAG, "onPause");
+        //closeCamera();
+        stopBackgroundThread();
+        super.onPause();
+    }
+
+    private void postDataUsingVolley(String img) {
+        // url to post our data
+        String url = "https://minor-project-nu.herokuapp.com/predict";
+//        loadingPB.setVisibility(View.VISIBLE);
+
+        // creating a new variable for our request queue
+        RequestQueue queue = Volley.newRequestQueue(getActivity());
+
+        // on below line we are calling a string
+        // request method to post the data to our API
+        // in this we are calling a post method.
+        Toast.makeText(getActivity(), "...........", Toast.LENGTH_SHORT).show();
+        StringRequest request = new StringRequest(Request.Method.POST, url, new com.android.volley.Response.Listener<String>() {
+            @Override
+            public void onResponse(String response) {
+                // inside on response method we are
+                // hiding our progress bar
+                // and setting data to edit text as empty
+//                loadingPB.setVisibility(View.GONE);
+//                nameEdt.setText("");
+//                jobEdt.setText("");
+
+                // on below line we are displaying a success toast message.
+                Toast.makeText(getActivity(), "Data added to API", Toast.LENGTH_SHORT).show();
+                try {
+                    // on below line we are parsing the response
+                    // to json object to extract data from it.
+                    JSONObject respObj = new JSONObject(response);
+                    Log.d("res",respObj.toString());
+                    // below are the strings which we
+                    // extract from our json object.
+//                    String name = respObj.getString("name");
+//                    String job = respObj.getString("job");
+
+                    // on below line we are setting this string s to our text view.
+//                    responseTV.setText("Name : " + name + "\n" + "Job : " + job);
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+            }
+        }, new com.android.volley.Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError error) {
+                // method to handle errors.
+                Log.d("excep",error.toString());
+                Toast.makeText(getActivity(), "Fail to get response = " + error, Toast.LENGTH_SHORT).show();
+            }
+        }) {
+            @Override
+            protected Map<String, String> getParams() {
+                // below line we are creating a map for
+                // storing our values in key and value pair.
+                Map<String, String> params = new HashMap<String, String>();
+
+                // on below line we are passing our key
+                // and value pair to our parameters.
+                params.put("img", img);
+//                params.put("job", job);
+
+                // at last we are
+                // returning our params.
+                return params;
+            }
+        };
+        // below line is to make
+        // a json object request.
+        queue.add(request);
+    }
 
 }
