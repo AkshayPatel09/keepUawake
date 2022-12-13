@@ -23,6 +23,7 @@ import android.hardware.camera2.TotalCaptureResult;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.Image;
 import android.media.ImageReader;
+import android.media.MediaPlayer;
 import android.os.Bundle;
 
 import androidx.annotation.NonNull;
@@ -123,6 +124,7 @@ public class cameraFragment extends Fragment {
     private Handler mHandler= new Handler();
     private int count = -1;
     private EditText ts,lv,al,dr;
+    private MediaPlayer mPlayer;
 
     public cameraFragment() {
         // Required empty public constructor
@@ -168,6 +170,7 @@ public class cameraFragment extends Fragment {
         dr = v.findViewById(R.id.drowsyEdt);
         assert textureView != null;
         textureView.setSurfaceTextureListener(textureListener);
+        mPlayer = MediaPlayer.create(getActivity(), R.raw.ring);
         if(!Python.isStarted())
             Python.start(new AndroidPlatform(getActivity()));
 
@@ -179,6 +182,7 @@ public class cameraFragment extends Fragment {
             @Override
             public void onClick(View v) {
                 mHandler.removeCallbacks(runnable);
+//                mHandler.postDelayed(closeRunnable,1000);
                 closeCamera();
 //                if(mCamera!=null)
 //                mCamera.release();
@@ -191,6 +195,20 @@ public class cameraFragment extends Fragment {
 
         return v;
     }
+
+
+    private Runnable closeRunnable = new Runnable() {
+        @Override
+        public void run() {
+            closeCamera();
+//                if(mCamera!=null)
+//                mCamera.release();
+            FragmentTransaction transaction = getActivity().getSupportFragmentManager().beginTransaction();
+            dashboardFragment fragment = new dashboardFragment();
+            transaction.replace(R.id.flMain, fragment);
+            transaction.commit();
+        }
+    };
 
     private Runnable runnable = new Runnable() {
         @Override
@@ -220,6 +238,9 @@ public class cameraFragment extends Fragment {
                         cnt = Integer.parseInt(temp);
                         cnt += 1;
                         dr.setText(Integer.toString(cnt));
+
+                        mPlayer.start();
+//                        mPlayer.start();
                         break;
                     default:
                         Toast.makeText(getActivity(), "Face not found!!", Toast.LENGTH_SHORT).show();
@@ -411,28 +432,32 @@ public class cameraFragment extends Fragment {
             assert texture != null;
             texture.setDefaultBufferSize(imageDimension.getWidth(), imageDimension.getHeight());
             Surface surface = new Surface(texture);
-            captureRequestBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
-            captureRequestBuilder.addTarget(surface);
-            cameraDevice.createCaptureSession(Arrays.asList(surface), new CameraCaptureSession.StateCallback() {
-                @Override
-                public void onConfigured(@NonNull CameraCaptureSession cameraCaptureSession) {
-                    //The camera is already closed
-                    if (null == cameraDevice) {
-                        return;
+            if (cameraDevice != null) {
+                captureRequestBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
+                captureRequestBuilder.addTarget(surface);
+                cameraDevice.createCaptureSession(Arrays.asList(surface), new CameraCaptureSession.StateCallback() {
+                    @Override
+                    public void onConfigured(@NonNull CameraCaptureSession cameraCaptureSession) {
+                        //The camera is already closed
+                        if (null == cameraDevice) {
+                            return;
+                        }
+                        // When the session is ready, we start displaying the preview.
+                        cameraCaptureSessions = cameraCaptureSession;
+                        updatePreview();
                     }
-                    // When the session is ready, we start displaying the preview.
-                    cameraCaptureSessions = cameraCaptureSession;
-                    updatePreview();
-                }
 
-                @Override
-                public void onConfigureFailed(@NonNull CameraCaptureSession cameraCaptureSession) {
-                    Toast.makeText(getActivity(), "Configuration change", Toast.LENGTH_SHORT).show();
-                }
-            }, null);
-        } catch (CameraAccessException e) {
-            e.printStackTrace();
+                    @Override
+                    public void onConfigureFailed(@NonNull CameraCaptureSession cameraCaptureSession) {
+                        Toast.makeText(getActivity(), "Configuration change", Toast.LENGTH_SHORT).show();
+                    }
+                }, null);
+            }
         }
+        catch(CameraAccessException e){
+                e.printStackTrace();
+        }
+
     }
 
     private void openCamera() {
